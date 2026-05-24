@@ -331,16 +331,6 @@
     @keyframes fall {
       to { transform: translateY(100vh) rotate(720deg); opacity: 0; }
     }
-
-    .wechat-tip {
-      font-size: 0.78rem;
-      color: var(--muted);
-      margin-top: 12px;
-      padding: 10px 12px;
-      background: #fff;
-      border-radius: 12px;
-      line-height: 1.55;
-    }
   </style>
 </head>
 <body>
@@ -412,14 +402,6 @@
       <button class="btn-soft hidden" id="btnBackEdit" type="button" style="width:100%;margin-top:12px;padding:10px;font-size:0.85rem;">
         ← 回去改礼物列表
       </button>
-    </div>
-
-    <div class="wechat-tip" id="openTip">
-      <strong>📱 微信收到文件怎么打开？</strong><br><br>
-      微信<strong>经常没有</strong>「在浏览器中打开」，这是正常的。请试下面任一方式：<br><br>
-      <strong>安卓：</strong>点文件下载 → 右上角「…」→「用其他应用打开」→ 选 <strong>Chrome</strong>；没有就去「文件管理 / Download」里找到该文件 → 长按 → 打开方式 → 浏览器<br><br>
-      <strong>iPhone：</strong>点文件 → 右上角「…」→「存储到"文件"」→ 打开 iPhone <strong>「文件」</strong> App → 点该 html（会用 Safari 打开）<br><br>
-      <strong>最省事（推荐）：</strong>不要发文件，发<strong>网页链接</strong>。链接在微信里点开就能用，见下方说明。
     </div>
 
     <details id="advancedDetails">
@@ -545,6 +527,70 @@
         .trim();
     }
 
+    /** 清理 OCR 前缀乱码、尾部标点 */
+    function normalizeProductLine(line) {
+      let s = cleanLine(line);
+      s = s.replace(/^[A-Za-z]{1,3}\s*[|｜]\s*/i, "");
+      s = s.replace(/^[A-Za-z]\s+(?=[\u4e00-\u9fff【\[])/i, "");
+      s = s.replace(/^[Gg]\s+/, "");
+      s = s.replace(/^[\|｜]+\s*/, "");
+      s = s.replace(/^[【\[]?\s*618\s*抢先购\s*/i, "");
+      s = s.replace(/[，,。.、;；\s]+$/, "");
+      s = s.replace(/\s+/g, " ").trim();
+      return s;
+    }
+
+    /** 优惠/礼金/抵扣文案，不是商品 */
+    function isPromoNoise(line) {
+      const compact = line.replace(/\s/g, "");
+      if (compact.length < 3) return true;
+      if (/平台礼金|礼金抵|店铺券|红包|满减|立减|运费险|店铺优惠|消费券/.test(compact)) return true;
+      if (/^平台/.test(compact) && /礼金|抵|减|券/.test(compact)) return true;
+      if (/礼金/.test(compact) && compact.length <= 12) return true;
+      if (/抵\s*[\d.]+$/.test(line.trim()) && compact.length <= 14) return true;
+      if (/^[\d.]+元?(抵|减)?$/.test(compact)) return true;
+      if (/^(官补|补贴|返现|淘金币)/.test(compact) && compact.length < 14) return true;
+      if (/^官网\s*$/.test(compact)) return true;
+      if (/^代订阅\s*\d/.test(compact) && !/Cursor|Pro|个月/.test(compact)) return true;
+      return false;
+    }
+
+    function dedupeSimilar(lines) {
+      const out = [];
+      for (const line of lines) {
+        const key = line.replace(/\s/g, "");
+        if (key.length < 4) continue;
+        let replaced = false;
+        for (let i = 0; i < out.length; i++) {
+          const ek = out[i].replace(/\s/g, "");
+          if (key === ek) {
+            replaced = true;
+            break;
+          }
+          if (ek.includes(key) && ek.length > key.length + 4) {
+            replaced = true;
+            break;
+          }
+          if (key.includes(ek) && key.length > ek.length + 4) {
+            out[i] = line;
+            replaced = true;
+            break;
+          }
+        }
+        if (!replaced) out.push(line);
+      }
+      return out;
+    }
+
+    function finalizeLines(lines) {
+      return dedupeSimilar(
+        lines
+          .map(normalizeProductLine)
+          .filter((s) => s.length >= 4 && s.length <= 120)
+          .filter((s) => !isShopName(s) && !isLatinGibberish(s) && !isPromoNoise(s) && !isUiNoise(s))
+      );
+    }
+
     function isShopName(line) {
       const t = line.trim();
       const compact = line.replace(/\s/g, "");
@@ -580,6 +626,7 @@
       if (/^(天猫|淘宝|京东|拼多多)$/.test(compact)) return true;
       if (countUiKeywords(line) >= 2) return true;
       if (countUiKeywords(line) >= 1 && compact.length < 16) return true;
+      if (isPromoNoise(line)) return true;
       const cjk = (line.match(/[\u4e00-\u9fff]/g) || []).length;
       if (spaceRatio(line) > 0.35 && cjk < 4) return true;
       return false;
@@ -615,6 +662,7 @@
       if (/^[xX×]\s*\d+$/.test(compact)) score -= 50;
       if (/^\d+\s*期/.test(compact)) score -= 30;
       if (/免息|热销|同款|券后/.test(compact) && compact.length < 12) score -= 20;
+      if (/礼金|平台礼|抵\d|官补|补贴/.test(compact)) score -= 40;
       if (latin > cjk * 3 && cjk < 2) score -= 25;
 
       return score;
@@ -627,7 +675,7 @@
     /** 淘宝/京东购物车：每个价格向上找得分最高的商品标题行 */
     function extractByPriceAnchor(raw) {
       const collapsed = collapseCjkSpaces(raw);
-      const lines = collapsed.split(/\n/).map(cleanLine).filter(Boolean);
+      const lines = collapsed.split(/\n/).map((l) => normalizeProductLine(l)).filter(Boolean);
       const found = [];
       const seen = new Set();
 
@@ -663,11 +711,11 @@
     /** 价格锚点失败时：按中文行打分取前几项 */
     function extractRelaxedFallback(raw) {
       const collapsed = collapseCjkSpaces(raw);
-      const lines = collapsed.split(/\n/).map(cleanLine).filter(Boolean);
+      const lines = collapsed.split(/\n/).map((l) => normalizeProductLine(l)).filter(Boolean);
       const ranked = [];
 
       for (const line of lines) {
-        if (isShopName(line) || isLatinGibberish(line) || isUiNoise(line)) continue;
+        if (isShopName(line) || isLatinGibberish(line) || isUiNoise(line) || isPromoNoise(line)) continue;
         const cjk = (line.match(/[\u4e00-\u9fff]/g) || []).length;
         if (cjk < 3) continue;
         const score = scoreProductCandidate(line);
@@ -683,7 +731,7 @@
         if (seen.has(key)) continue;
         seen.add(key);
         out.push(line);
-        if (out.length >= 8) break;
+        if (out.length >= 6) break;
       }
       return out;
     }
@@ -691,22 +739,22 @@
     function smartParseLines(raw) {
       if (!raw || !raw.trim()) return [];
 
-      let result = extractByPriceAnchor(raw).filter((s) => !isShopName(s) && !isLatinGibberish(s));
-      if (result.length > 0) return result;
+      let result = finalizeLines(extractByPriceAnchor(raw));
+      if (result.length > 0) return result.slice(0, 10);
 
-      result = extractRelaxedFallback(raw);
-      if (result.length > 0) return result;
+      result = finalizeLines(extractRelaxedFallback(raw));
+      if (result.length > 0) return result.slice(0, 10);
 
       const collapsed = collapseCjkSpaces(raw);
       const noiseExact = /^(全选|删除|移入收藏|凑单|领券|结算|店铺|合计|再逛逛|编辑|完成|￥|¥|\d+|\d+\.\d+|x\d+|X\d+)$/i;
-      return collapsed
-        .split(/\n|\t|；|;/)
-        .map(cleanLine)
-        .filter((s) => s.length >= 4 && s.length <= 100)
-        .filter((s) => !noiseExact.test(s.replace(/\s/g, "")))
-        .filter((s) => !isShopName(s) && !isLatinGibberish(s) && !isUiNoise(s))
-        .filter((s) => (s.match(/[\u4e00-\u9fff]/g) || []).length >= 3)
-        .slice(0, 8);
+      return finalizeLines(
+        collapsed
+          .split(/\n|\t|；|;/)
+          .map(normalizeProductLine)
+          .filter((s) => s.length >= 4 && s.length <= 100)
+          .filter((s) => !noiseExact.test(s.replace(/\s/g, "")))
+          .filter((s) => (s.match(/[\u4e00-\u9fff]/g) || []).length >= 3)
+      ).slice(0, 10);
     }
 
     function loadDrawn() {
@@ -776,7 +824,7 @@
         display.innerHTML = '<span class="hint">导入礼物后就能抽啦</span>';
       } else if (available.length === 0) {
         display.innerHTML = '<span class="hint">全部抽完啦 🎉<br>点「重新抽」再来一轮</span>';
-      } else if (viewMode === "draw" && !rolling) {
+      } else if (viewMode === "draw" && !rolling && !display.querySelector(".result")) {
         display.innerHTML = '<span class="hint">准备好啦，点下面抽一个</span>';
       }
 
