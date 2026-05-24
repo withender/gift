@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>🎁 礼物盲盒</title>
+  <style>
+    :root {
+      --bg: #fff5f7;
+      --card: #ffffff;
+      --accent: #e85d75;
+      --accent-soft: #ffd6de;
+      --text: #3d2c32;
+      --muted: #8a737a;
+      --shadow: 0 12px 40px rgba(232, 93, 117, 0.15);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: radial-gradient(circle at top, #ffe8ee, var(--bg) 45%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 20px 16px 48px;
+    }
+
+    .wrap { max-width: 420px; margin: 0 auto; }
+
+    header { text-align: center; margin-bottom: 20px; }
+    header h1 { font-size: 1.55rem; font-weight: 700; }
+    header p { margin-top: 8px; color: var(--muted); font-size: 0.9rem; line-height: 1.55; }
+
+    .steps {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .step {
+      flex: 1;
+      text-align: center;
+      padding: 10px 6px;
+      border-radius: 14px;
+      background: #fff;
+      font-size: 0.78rem;
+      color: var(--muted);
+      border: 2px solid transparent;
+      line-height: 1.35;
+    }
+
+    .step.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      font-weight: 600;
+      background: #fff8fa;
+    }
+
+    .step.done { color: #2a9d6a; }
+
+    .card {
+      background: var(--card);
+      border-radius: 20px;
+      padding: 20px 16px;
+      box-shadow: var(--shadow);
+      margin-bottom: 14px;
+    }
+
+    .section-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .guide {
+      font-size: 0.84rem;
+      color: var(--muted);
+      line-height: 1.65;
+      margin-bottom: 14px;
+      padding: 12px;
+      background: #faf6f7;
+      border-radius: 12px;
+    }
+
+    .guide strong { color: var(--text); }
+    .guide ol { padding-left: 1.2em; margin-top: 6px; }
+    .guide li { margin-bottom: 4px; }
+
+    .upload-btn {
+      display: block;
+      width: 100%;
+      padding: 18px 16px;
+      border: 2px dashed var(--accent);
+      border-radius: 16px;
+      background: #fff8fa;
+      color: var(--accent);
+      font-size: 1rem;
+      font-weight: 600;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    .upload-btn input { display: none; }
+
+    .upload-sub {
+      display: block;
+      margin-top: 6px;
+      font-size: 0.78rem;
+      font-weight: 400;
+      color: var(--muted);
+    }
+
+    .ocr-status {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 10px;
+      min-height: 1.2em;
+      text-align: center;
+    }
+
+    .add-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .add-row input {
+      flex: 1;
+      border: 1px solid #ecdde2;
+      border-radius: 999px;
+      padding: 12px 16px;
+      font-size: 0.92rem;
+      font-family: inherit;
+    }
+
+    .add-row input:focus {
+      outline: 2px solid var(--accent-soft);
+      border-color: var(--accent);
+    }
+
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 12px 16px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    button:active { transform: scale(0.97); }
+
+    .btn-accent {
+      background: linear-gradient(135deg, #f06b82, var(--accent));
+      color: #fff;
+      box-shadow: 0 6px 16px rgba(232, 93, 117, 0.3);
+    }
+
+    .btn-accent:disabled {
+      opacity: 0.5;
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+
+    .btn-soft { background: #f5eef0; color: var(--text); }
+
+    .item-list {
+      list-style: none;
+      margin-top: 14px;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+
+    .item-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #faf6f7;
+      border-radius: 12px;
+      margin-bottom: 8px;
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    .item-list li span { flex: 1; word-break: break-word; }
+
+    .item-list .del {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border-radius: 50%;
+      background: #ffe0e6;
+      color: var(--accent);
+      font-size: 1rem;
+      line-height: 28px;
+    }
+
+    .empty-list {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+      padding: 16px 8px;
+    }
+
+    .pool-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .confirm-row { margin-top: 14px; }
+    .confirm-row button { width: 100%; padding: 14px; font-size: 1rem; }
+
+    .display {
+      min-height: 110px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 16px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #fff, var(--accent-soft));
+      border: 2px dashed var(--accent-soft);
+    }
+
+    .display.rolling { animation: pulse 0.35s ease infinite alternate; }
+
+    @keyframes pulse {
+      from { transform: scale(1); opacity: 0.85; }
+      to   { transform: scale(1.02); opacity: 1; }
+    }
+
+    .display .hint { color: var(--muted); font-size: 0.92rem; line-height: 1.5; }
+    .display .result {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--accent);
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .display .result small {
+      display: block;
+      margin-top: 8px;
+      font-size: 0.84rem;
+      font-weight: 400;
+      color: var(--muted);
+    }
+
+    .btn-row { display: flex; gap: 10px; margin-top: 16px; }
+    .btn-row button { flex: 1; padding: 14px; font-size: 1rem; }
+
+    .stats {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 12px;
+    }
+
+    .hidden { display: none !important; }
+
+    details { margin-top: 10px; }
+
+    summary {
+      cursor: pointer;
+      font-size: 0.82rem;
+      color: var(--muted);
+      user-select: none;
+      padding: 8px 0;
+    }
+
+    .code-box, textarea {
+      width: 100%;
+      border: 1px solid #ecdde2;
+      border-radius: 12px;
+      padding: 10px;
+      font-size: 0.85rem;
+      font-family: inherit;
+      line-height: 1.5;
+    }
+
+    .code-box {
+      min-height: 72px;
+      font-family: Consolas, monospace;
+      font-size: 0.72rem;
+    }
+
+    .admin-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .admin-actions button { flex: unset; padding: 10px 14px; font-size: 0.85rem; }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: rgba(61, 44, 50, 0.92);
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 999px;
+      font-size: 0.88rem;
+      opacity: 0;
+      transition: transform 0.3s, opacity 0.3s;
+      pointer-events: none;
+      z-index: 99;
+      max-width: 90vw;
+      text-align: center;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    .confetti {
+      position: fixed;
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      pointer-events: none;
+      animation: fall 1.2s ease forwards;
+      z-index: 50;
+    }
+
+    @keyframes fall {
+      to { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+    }
+
+    .wechat-tip {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 12px;
+      padding: 10px 12px;
+      background: #fff;
+      border-radius: 12px;
+      line-height: 1.55;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>🎁 礼物盲盒</h1>
+      <p>把购物车里的东西放进盲盒<br>随机抽一件，就是这次想要的礼物～</p>
+    </header>
+
+    <div class="steps">
+      <div class="step active" id="step1Badge">① 导入购物车</div>
+      <div class="step" id="step2Badge">② 开始抽奖</div>
+    </div>
+
+    <!-- 第一步：导入 -->
+    <div class="card" id="setupSection">
+      <div class="section-title">第一步：把购物车放进盲盒</div>
+      <div class="guide">
+        <strong>手机 3 步搞定：</strong>
+        <ol>
+          <li>打开淘宝/京东 → 购物车</li>
+          <li>截一张<strong>长截图</strong>（商品名要清楚）</li>
+          <li>回到本页，点下面按钮选图 → 自动识别</li>
+        </ol>
+        截图太长？可以分多张上传，会自动合并。
+      </div>
+
+      <label class="upload-btn">
+        📷 从相册选购物车截图
+        <span class="upload-sub">支持多张，识别约需十几秒</span>
+        <input type="file" id="fileInput" accept="image/*" multiple />
+      </label>
+      <div class="ocr-status" id="ocrStatus"></div>
+
+      <div class="add-row">
+        <input type="text" id="manualInput" placeholder="或手动输入一件礼物…" enterkeyhint="done" />
+        <button class="btn-soft" id="btnAdd" type="button">添加</button>
+      </div>
+
+      <ul class="item-list" id="itemList"></ul>
+      <div class="empty-list" id="emptyHint">还没有礼物，上传截图或手动添加</div>
+
+      <div class="pool-bar">
+        <span id="poolCount">共 0 件</span>
+        <button class="btn-soft" id="btnClearAll" type="button" style="padding:6px 12px;font-size:0.78rem;">清空全部</button>
+      </div>
+
+      <div class="confirm-row">
+        <button class="btn-accent" id="btnGoDraw" type="button" disabled>确认好了，去抽奖 →</button>
+      </div>
+    </div>
+
+    <!-- 第二步：抽奖 -->
+    <div class="card" id="drawSection">
+      <div class="section-title">第二步：抽一个</div>
+      <div class="display" id="display">
+        <span class="hint">导入礼物后就能抽啦</span>
+      </div>
+      <div class="btn-row">
+        <button class="btn-accent" id="btnDraw" type="button" disabled>✨ 抽一个</button>
+        <button class="btn-soft" id="btnReset" type="button">重新抽</button>
+      </div>
+      <div class="stats">
+        <span id="statPool">还能抽 0 件</span>
+        <span id="statDone">已抽 0 件</span>
+      </div>
+      <button class="btn-soft hidden" id="btnBackEdit" type="button" style="width:100%;margin-top:12px;padding:10px;font-size:0.85rem;">
+        ← 回去改礼物列表
+      </button>
+    </div>
+
+    <div class="wechat-tip" id="openTip">
+      <strong>📱 微信收到文件怎么打开？</strong><br><br>
+      微信<strong>经常没有</strong>「在浏览器中打开」，这是正常的。请试下面任一方式：<br><br>
+      <strong>安卓：</strong>点文件下载 → 右上角「…」→「用其他应用打开」→ 选 <strong>Chrome</strong>；没有就去「文件管理 / Download」里找到该文件 → 长按 → 打开方式 → 浏览器<br><br>
+      <strong>iPhone：</strong>点文件 → 右上角「…」→「存储到"文件"」→ 打开 iPhone <strong>「文件」</strong> App → 点该 html（会用 Safari 打开）<br><br>
+      <strong>最省事（推荐）：</strong>不要发文件，发<strong>网页链接</strong>。链接在微信里点开就能用，见下方说明。
+    </div>
+
+    <details id="advancedDetails">
+      <summary>💻 电脑高级录入（可选，手机不用看）</summary>
+      <div class="card" style="margin-top:8px;box-shadow:none;padding-top:12px;">
+        <div class="guide">
+          Chrome 打开 cart.taobao.com → <strong>Ctrl+Shift+J</strong> 开控制台 →
+          不能粘贴就先输入 <strong>allow pasting</strong> 回车 → 粘贴脚本回车。
+        </div>
+        <textarea class="code-box" id="extractScript" readonly></textarea>
+        <div class="admin-actions">
+          <button class="btn-soft" id="btnCopyScript" type="button">复制脚本</button>
+          <button class="btn-soft" id="btnPasteMerge" type="button">粘贴识别结果并合并</button>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script>
+    const STORAGE_KEY = "gift_blind_box_items_v2";
+    const DRAWN_KEY = "gift_blind_box_drawn_v2";
+
+    const itemList = document.getElementById("itemList");
+    const emptyHint = document.getElementById("emptyHint");
+    const poolCount = document.getElementById("poolCount");
+    const fileInput = document.getElementById("fileInput");
+    const ocrStatus = document.getElementById("ocrStatus");
+    const manualInput = document.getElementById("manualInput");
+    const btnAdd = document.getElementById("btnAdd");
+    const btnClearAll = document.getElementById("btnClearAll");
+    const btnGoDraw = document.getElementById("btnGoDraw");
+    const display = document.getElementById("display");
+    const btnDraw = document.getElementById("btnDraw");
+    const btnReset = document.getElementById("btnReset");
+    const btnBackEdit = document.getElementById("btnBackEdit");
+    const statPool = document.getElementById("statPool");
+    const statDone = document.getElementById("statDone");
+    const step1Badge = document.getElementById("step1Badge");
+    const step2Badge = document.getElementById("step2Badge");
+    const setupSection = document.getElementById("setupSection");
+    const drawSection = document.getElementById("drawSection");
+    const toast = document.getElementById("toast");
+    const extractScript = document.getElementById("extractScript");
+    const btnCopyScript = document.getElementById("btnCopyScript");
+    const btnPasteMerge = document.getElementById("btnPasteMerge");
+
+    const CART_EXTRACT_SCRIPT = `(function(){
+  const seen = new Set();
+  const items = [];
+  const push = (t) => {
+    t = (t || "").replace(/\\s+/g, " ").trim();
+    if (t.length < 4 || t.length > 120) return;
+    if (/^(全选|删除|移入|凑单|领券|结算|店铺|合计|￥|¥)/.test(t)) return;
+    if (/^\\d+$/.test(t)) return;
+    if (seen.has(t)) return;
+    seen.add(t);
+    items.push(t);
+  };
+  document.querySelectorAll('a[href*="item.taobao"], a[href*="detail.tmall"], a[href*="item.htm"]').forEach((a) => {
+    push(a.getAttribute("title"));
+    push(a.innerText);
+  });
+  document.querySelectorAll('[class*="Title"], [class*="title"], [class*="itemTitle"], [class*="ItemTitle"]').forEach((el) => {
+    push(el.getAttribute("title") || el.innerText);
+  });
+  const text = items.join("\\n");
+  if (!text) { alert("没抓到商品名，请滚到底加载完再试"); return; }
+  navigator.clipboard.writeText(text).then(() => {
+    alert("已复制 " + items.length + " 件！回到盲盒页点「粘贴识别结果并合并」");
+  }).catch(() => prompt("复制下面全部内容：", text));
+})();`;
+
+    extractScript.value = CART_EXTRACT_SCRIPT;
+
+    let items = [];
+    let rolling = false;
+    let viewMode = "setup";
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 2400);
+    }
+
+    function smartParseLines(raw) {
+      const noise = /^(全选|删除|移入收藏|凑单|领券|结算|店铺|合计|再逛逛|编辑|完成|￥|¥|\d+|\d+\.\d+|x\d+|X\d+|库存|有货|无货|降价|失效|重选|规格|颜色分类|尺码|数量|购物车|淘宝|京东)$/i;
+      const priceOnly = /^[￥¥]?\s*[\d,.]+$/;
+      return raw
+        .split(/\n|\t|；|;/)
+        .map((s) =>
+          s
+            .replace(/^[·•\-\d.)\]、\s]+/, "")
+            .replace(/\s*[￥¥]\s*[\d,.]+.*$/, "")
+            .replace(/\s+x\s*\d+\s*$/i, "")
+            .replace(/\s+\d+\s*件\s*$/, "")
+            .trim()
+        )
+        .filter((s) => s.length >= 4 && s.length <= 120)
+        .filter((s) => !noise.test(s) && !priceOnly.test(s));
+    }
+
+    function loadDrawn() {
+      try { return JSON.parse(localStorage.getItem(DRAWN_KEY) || "[]"); }
+      catch { return []; }
+    }
+
+    function saveDrawn(arr) {
+      localStorage.setItem(DRAWN_KEY, JSON.stringify(arr));
+    }
+
+    function persistItems() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    }
+
+    function loadItems() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+        items = Array.isArray(saved) ? saved : [];
+      } catch {
+        items = [];
+      }
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    function mergeLines(newLines) {
+      let added = 0;
+      newLines.forEach((line) => {
+        if (!items.includes(line)) {
+          items.push(line);
+          added++;
+        }
+      });
+      if (added) {
+        persistItems();
+        saveDrawn([]);
+        renderAll();
+        showToast(`添加了 ${added} 件礼物`);
+      }
+      return added;
+    }
+
+    function renderItemList() {
+      itemList.innerHTML = "";
+      items.forEach((name, idx) => {
+        const li = document.createElement("li");
+        li.innerHTML = `<span>${escapeHtml(name)}</span><button class="del" type="button" data-idx="${idx}" aria-label="删除">×</button>`;
+        itemList.appendChild(li);
+      });
+      emptyHint.classList.toggle("hidden", items.length > 0);
+      poolCount.textContent = `共 ${items.length} 件`;
+      btnGoDraw.disabled = items.length === 0;
+    }
+
+    function updateStats() {
+      const drawn = loadDrawn();
+      const drawnSet = new Set(drawn);
+      const available = items.filter((i) => !drawnSet.has(i));
+      statPool.textContent = `还能抽 ${available.length} 件`;
+      statDone.textContent = `已抽 ${drawn.length} 件`;
+      btnDraw.disabled = available.length === 0 || items.length === 0 || rolling;
+
+      if (items.length === 0) {
+        display.innerHTML = '<span class="hint">导入礼物后就能抽啦</span>';
+      } else if (available.length === 0) {
+        display.innerHTML = '<span class="hint">全部抽完啦 🎉<br>点「重新抽」再来一轮</span>';
+      } else if (viewMode === "draw" && !rolling) {
+        display.innerHTML = '<span class="hint">准备好啦，点下面抽一个</span>';
+      }
+
+      step1Badge.classList.toggle("done", items.length > 0);
+      step1Badge.classList.toggle("active", viewMode === "setup");
+      step2Badge.classList.toggle("active", viewMode === "draw");
+      step2Badge.classList.toggle("done", drawn.length > 0);
+    }
+
+    function renderAll() {
+      renderItemList();
+      updateStats();
+    }
+
+    function setView(mode) {
+      viewMode = mode;
+      if (mode === "draw") {
+        setupSection.classList.add("hidden");
+        drawSection.classList.remove("hidden");
+        btnBackEdit.classList.remove("hidden");
+        drawSection.scrollIntoView({ behavior: "smooth", block: "start" });
+        if (items.length > 0) {
+          display.innerHTML = '<span class="hint">准备好啦，点下面抽一个</span>';
+        }
+      } else {
+        setupSection.classList.remove("hidden");
+        drawSection.classList.remove("hidden");
+        btnBackEdit.classList.add("hidden");
+        setupSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      updateStats();
+    }
+
+    itemList.addEventListener("click", (e) => {
+      const btn = e.target.closest(".del");
+      if (!btn) return;
+      items.splice(Number(btn.dataset.idx), 1);
+      persistItems();
+      saveDrawn([]);
+      renderAll();
+    });
+
+    btnAdd.addEventListener("click", () => {
+      const val = manualInput.value.trim();
+      if (!val) return;
+      if (items.includes(val)) {
+        showToast("已经在列表里啦");
+        return;
+      }
+      items.push(val);
+      manualInput.value = "";
+      persistItems();
+      saveDrawn([]);
+      renderAll();
+    });
+
+    manualInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") btnAdd.click();
+    });
+
+    btnClearAll.addEventListener("click", () => {
+      if (!items.length) return;
+      if (!confirm("清空全部礼物？")) return;
+      items = [];
+      persistItems();
+      saveDrawn([]);
+      renderAll();
+      showToast("已清空");
+    });
+
+    btnGoDraw.addEventListener("click", () => {
+      if (!items.length) return;
+      persistItems();
+      setView("draw");
+    });
+
+    btnBackEdit.addEventListener("click", () => setView("setup"));
+
+    async function runOcrOnFile(file) {
+      const { data } = await Tesseract.recognize(file, "chi_sim+eng", {
+        logger: (m) => {
+          if (m.status === "recognizing text") {
+            ocrStatus.textContent = `识别中 ${Math.round((m.progress || 0) * 100)}%…`;
+          }
+        },
+      });
+      return smartParseLines(data.text);
+    }
+
+    fileInput.addEventListener("change", async () => {
+      const files = [...fileInput.files];
+      fileInput.value = "";
+      if (!files.length) return;
+
+      ocrStatus.textContent = `正在识别 0/${files.length} 张…`;
+      let totalAdded = 0;
+
+      for (let i = 0; i < files.length; i++) {
+        ocrStatus.textContent = `正在识别 ${i + 1}/${files.length} 张（首次较慢）…`;
+        try {
+          const lines = await runOcrOnFile(files[i]);
+          totalAdded += mergeLines(lines);
+        } catch {
+          showToast(`第 ${i + 1} 张识别失败`);
+        }
+      }
+
+      if (totalAdded) {
+        ocrStatus.textContent = `识别完成，新加入 ${totalAdded} 件，请检查列表`;
+      } else {
+        ocrStatus.textContent = "没识别到商品名，换清晰截图或手动添加";
+      }
+    });
+
+    btnCopyScript.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(CART_EXTRACT_SCRIPT);
+        showToast("脚本已复制");
+      } catch {
+        extractScript.select();
+        showToast("请手动全选复制");
+      }
+    });
+
+    btnPasteMerge.addEventListener("click", async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        const lines = smartParseLines(text);
+        if (!lines.length) {
+          showToast("剪贴板里没有有效商品名");
+          return;
+        }
+        mergeLines(lines);
+      } catch {
+        const text = prompt("把复制的商品名粘贴到这里：");
+        if (text) mergeLines(smartParseLines(text));
+      }
+    });
+
+    function confetti() {
+      const colors = ["#e85d75", "#ffb3c1", "#ffd166", "#06d6a0", "#118ab2"];
+      for (let i = 0; i < 24; i++) {
+        const el = document.createElement("div");
+        el.className = "confetti";
+        el.style.left = Math.random() * 100 + "vw";
+        el.style.top = "-10px";
+        el.style.background = colors[i % colors.length];
+        el.style.animationDelay = Math.random() * 0.4 + "s";
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 1400);
+      }
+    }
+
+    function showResult(name) {
+      display.classList.remove("rolling");
+      display.innerHTML = `<div class="result">${escapeHtml(name)}<small>就是它了 💝</small></div>`;
+    }
+
+    btnReset.addEventListener("click", () => {
+      if (!confirm("重新抽？已抽记录会清空，礼物列表保留")) return;
+      saveDrawn([]);
+      display.innerHTML = '<span class="hint">准备好啦，点下面抽一个</span>';
+      updateStats();
+      showToast("可以重新抽啦");
+    });
+
+    btnDraw.addEventListener("click", () => {
+      if (rolling) return;
+      const drawn = loadDrawn();
+      const drawnSet = new Set(drawn);
+      const available = items.filter((i) => !drawnSet.has(i));
+      if (!available.length) return;
+
+      rolling = true;
+      btnDraw.disabled = true;
+      display.classList.add("rolling");
+
+      const winner = available[Math.floor(Math.random() * available.length)];
+      let ticks = 0;
+      const maxTicks = 18 + Math.floor(Math.random() * 8);
+
+      const timer = setInterval(() => {
+        const flash = available[Math.floor(Math.random() * available.length)];
+        display.innerHTML = `<div class="result" style="font-size:1rem;color:var(--text)">${escapeHtml(flash)}</div>`;
+        ticks++;
+        if (ticks >= maxTicks) {
+          clearInterval(timer);
+          drawn.push(winner);
+          saveDrawn(drawn);
+          showResult(winner);
+          confetti();
+          rolling = false;
+          updateStats();
+        }
+      }, 80);
+    });
+
+    loadItems();
+    if (items.length > 0) setView("draw");
+    else setView("setup");
+    renderAll();
+  </script>
+</body>
+</html>
