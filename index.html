@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <title>🎁 礼物盲盒</title>
+  <title>🎁 困困包的礼物盲盒</title>
   <style>
     :root {
       --bg: #fff5f7;
@@ -365,7 +365,8 @@
           <li>截一张<strong>长截图</strong>（商品名要清楚）</li>
           <li>回到本页，点下面按钮选图 → 自动识别</li>
         </ol>
-        截图太长？可以分多张上传，会自动合并。
+        截图太长？可以分多张上传，会自动合并。<br>
+        <strong>识别后请核对列表</strong>，不对的可点 × 删掉，或手动添加。
       </div>
 
       <label class="upload-btn">
@@ -505,21 +506,115 @@
       setTimeout(() => toast.classList.remove("show"), 2400);
     }
 
+    function collapseCjkSpaces(text) {
+      let s = text;
+      let prev;
+      do {
+        prev = s;
+        s = s.replace(/([\u4e00-\u9fff])\s+([\u4e00-\u9fff])/g, "$1$2");
+      } while (s !== prev);
+      return s;
+    }
+
+    const UI_KEYWORDS = [
+      "购物车", "搜索", "管理", "官方立减", "降价", "分组", "常购", "筛选",
+      "结算", "全选", "合计", "首页", "逛逛", "消息", "我的淘宝",
+      "88VIP", "消费券", "ssvip", "期免息", "免息", "热销", "同款",
+      "低于同款", "均价", "已售", "直播中", "次日达", "领券", "凑单",
+      "加入购物车", "商品管理", "抢先购截止", "消费关",
+    ];
+
+    function countUiKeywords(line) {
+      const compact = line.replace(/\s/g, "");
+      return UI_KEYWORDS.filter((k) => compact.includes(k)).length;
+    }
+
+    function spaceRatio(s) {
+      if (!s.length) return 1;
+      return (s.match(/\s/g) || []).length / s.length;
+    }
+
+    function cleanLine(s) {
+      return s
+        .replace(/^[·•\-\d.)\]、\s]+/, "")
+        .replace(/\s*[￥¥]\s*[\d,.]+.*$/, "")
+        .replace(/\s*x\s*\d+\s*$/i, "")
+        .replace(/\s+\d+\s*件\s*$/, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function isUiNoise(line) {
+      const compact = line.replace(/\s/g, "");
+      if (compact.length < 4) return true;
+      if (/^[\d\s.¥￥,，]+$/.test(compact)) return true;
+      if (/^[xX×]\d+$/.test(compact)) return true;
+      if (/^[\d]+[:：]\d+$/.test(compact)) return true;
+      if (/购物.*车.*[\(（]?\d+/.test(compact)) return true;
+      if (/^Q?\s*搜索/.test(line)) return true;
+      if (/^(首页|逛逛|消息|购物车|我的淘宝)$/.test(compact)) return true;
+      if (/^(天猫|淘宝|京东|拼多多)$/.test(compact)) return true;
+      if (/官方旗舰店$/.test(compact) && compact.length < 20) return true;
+      if (countUiKeywords(line) >= 2) return true;
+      if (countUiKeywords(line) >= 1 && compact.length < 18) return true;
+      if (spaceRatio(line) > 0.12) return true;
+      return false;
+    }
+
+    function looksLikeProduct(line) {
+      if (line.length < 5 || line.length > 100) return false;
+      if (isUiNoise(line)) return false;
+      const cjk = (line.match(/[\u4e00-\u9fff]/g) || []).length;
+      const latin = (line.match(/[A-Za-z]/g) || []).length;
+      if (cjk + latin < 4) return false;
+      if (cjk >= 4) return true;
+      if (latin >= 8) return true;
+      return false;
+    }
+
+    /** 淘宝/京东购物车截图：从价格行向上找商品标题 */
+    function extractByPriceAnchor(raw) {
+      const collapsed = collapseCjkSpaces(raw);
+      const lines = collapsed.split(/\n/).map(cleanLine).filter(Boolean);
+      const found = [];
+      const seen = new Set();
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (!/[¥￥]\s*[\d,.]+/.test(line)) continue;
+        if (/合计|运费|优惠|满减|已选/.test(line.replace(/\s/g, ""))) continue;
+
+        for (let j = i - 1; j >= Math.max(0, i - 5); j--) {
+          let candidate = lines[j];
+          if (/^[xX×]\s*\d+$/.test(candidate.replace(/\s/g, ""))) continue;
+          if (/^\d+\s*期/.test(candidate)) continue;
+          if (/免息|热销|同款|券后|折/.test(candidate) && candidate.length < 12) continue;
+          if (!looksLikeProduct(candidate)) continue;
+
+          const key = candidate.replace(/\s/g, "").slice(0, 20);
+          if (seen.has(key)) break;
+          seen.add(key);
+          found.push(candidate);
+          break;
+        }
+      }
+      return found;
+    }
+
     function smartParseLines(raw) {
-      const noise = /^(全选|删除|移入收藏|凑单|领券|结算|店铺|合计|再逛逛|编辑|完成|￥|¥|\d+|\d+\.\d+|x\d+|X\d+|库存|有货|无货|降价|失效|重选|规格|颜色分类|尺码|数量|购物车|淘宝|京东)$/i;
+      const noiseExact = /^(全选|删除|移入收藏|凑单|领券|结算|店铺|合计|再逛逛|编辑|完成|￥|¥|\d+|\d+\.\d+|x\d+|X\d+|库存|有货|无货|降价|失效|重选|规格|颜色分类|尺码|数量|购物车|淘宝|京东|天猫|管理|筛选|搜索)$/i;
       const priceOnly = /^[￥¥]?\s*[\d,.]+$/;
-      return raw
+
+      const fromPrice = extractByPriceAnchor(raw);
+      if (fromPrice.length > 0) return fromPrice;
+
+      const collapsed = collapseCjkSpaces(raw);
+      return collapsed
         .split(/\n|\t|；|;/)
-        .map((s) =>
-          s
-            .replace(/^[·•\-\d.)\]、\s]+/, "")
-            .replace(/\s*[￥¥]\s*[\d,.]+.*$/, "")
-            .replace(/\s+x\s*\d+\s*$/i, "")
-            .replace(/\s+\d+\s*件\s*$/, "")
-            .trim()
-        )
-        .filter((s) => s.length >= 4 && s.length <= 120)
-        .filter((s) => !noise.test(s) && !priceOnly.test(s));
+        .map(cleanLine)
+        .filter((s) => s.length >= 5 && s.length <= 100)
+        .filter((s) => !noiseExact.test(s.replace(/\s/g, "")) && !priceOnly.test(s))
+        .filter(looksLikeProduct);
     }
 
     function loadDrawn() {
@@ -698,7 +793,7 @@
       }
 
       if (totalAdded) {
-        ocrStatus.textContent = `识别完成，新加入 ${totalAdded} 件，请检查列表`;
+        ocrStatus.textContent = `识别完成，筛出 ${totalAdded} 件，请核对（不对的点 × 删掉）`;
       } else {
         ocrStatus.textContent = "没识别到商品名，换清晰截图或手动添加";
       }
