@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <title>🎁 困困包的礼物盲盒</title>
+  <title>🎁 困困包专属礼物盲盒</title>
   <style>
     :root {
       --bg: #fff5f7;
@@ -551,51 +551,25 @@
       if (/[>＞]$/.test(t)) return true;
       if (/旗舰店\s*[>＞]?$/.test(compact) && compact.length < 40) return true;
       if (/(天猫|淘宝|京东|拼多多)/.test(compact) && /旗舰店/.test(compact) && compact.length < 35) return true;
-      if (/^[\u4e00-\u9fff]{2,14}官方旗舰店/.test(compact)) return true;
+      if (/^[\u4e00-\u9fff]{2,16}官方旗舰店/.test(compact) && !/驱蚊|兰蔻|口红|面膜|精华|订阅/.test(compact)) return true;
       return false;
     }
 
     function isLatinGibberish(line) {
       const latin = (line.match(/[A-Za-z]/g) || []).length;
       const cjk = (line.match(/[\u4e00-\u9fff]/g) || []).length;
-      if (latin < 5) return false;
-      if (/cursor|pro|lancome|sk-ii/i.test(line) && cjk >= 2) return false;
-      if (cjk >= 5) return false;
+      if (latin < 6) return false;
+      if (/cursor|pro|lancome|sk-ii/i.test(line)) return false;
+      if (cjk >= 4) return false;
       const upper = (line.match(/[A-Z]/g) || []).length;
-      if (cjk === 0 && latin >= 6) return true;
-      if (upper / latin > 0.45 && cjk < 2) return true;
+      if (cjk === 0 && latin >= 8) return true;
+      if (upper / latin > 0.5 && cjk < 2) return true;
       return false;
-    }
-
-    function scoreProductCandidate(line) {
-      if (!line || line.length < 4) return -100;
-      if (isShopName(line) || isLatinGibberish(line) || isUiNoise(line)) return -100;
-
-      const compact = line.replace(/\s/g, "");
-      const cjk = (line.match(/[\u4e00-\u9fff]/g) || []).length;
-      const latin = (line.match(/[A-Za-z]/g) || []).length;
-      let score = 0;
-
-      score += cjk * 3;
-      if (cjk >= 8) score += 15;
-      else if (cjk >= 5) score += 8;
-
-      if (/Pro|订阅|驱蚊|兰蔻|香水|口红|面膜|精华|乳液|礼盒|耳机|玩偶|手链|保温杯/.test(compact)) score += 12;
-      if (/618|抢先购|专享|包邮/.test(compact) && cjk >= 4) score += 4;
-      if (/cursor/i.test(line) && cjk >= 2) score += 10;
-
-      if (/^[xX×]\s*\d+$/.test(compact)) score -= 50;
-      if (/^\d+\s*期/.test(compact)) score -= 30;
-      if (/免息|热销|同款|券后/.test(compact) && compact.length < 14) score -= 25;
-      if (latin > cjk * 2 && cjk < 4) score -= 20;
-      if (spaceRatio(line) > 0.15) score -= 15;
-
-      return score;
     }
 
     function isUiNoise(line) {
       const compact = line.replace(/\s/g, "");
-      if (compact.length < 4) return true;
+      if (compact.length < 3) return true;
       if (isShopName(line) || isLatinGibberish(line)) return true;
       if (/^[\d\s.¥￥,，]+$/.test(compact)) return true;
       if (/^[xX×]\d+$/.test(compact)) return true;
@@ -605,13 +579,49 @@
       if (/^(首页|逛逛|消息|购物车|我的淘宝)$/.test(compact)) return true;
       if (/^(天猫|淘宝|京东|拼多多)$/.test(compact)) return true;
       if (countUiKeywords(line) >= 2) return true;
-      if (countUiKeywords(line) >= 1 && compact.length < 18) return true;
-      if (spaceRatio(line) > 0.12) return true;
+      if (countUiKeywords(line) >= 1 && compact.length < 16) return true;
+      const cjk = (line.match(/[\u4e00-\u9fff]/g) || []).length;
+      if (spaceRatio(line) > 0.35 && cjk < 4) return true;
       return false;
     }
 
+    function isLikelyPriceLine(line) {
+      const compact = line.replace(/\s/g, "");
+      if (/[¥￥]\s*[\d,.]+/.test(line)) return true;
+      if (/^[\d]{2,5}(\.[\d]{1,2})?$/.test(compact)) {
+        const n = parseFloat(compact);
+        if (n >= 10 && n < 100000) return true;
+      }
+      return false;
+    }
+
+    function scoreProductCandidate(line) {
+      if (!line || line.length < 3) return -100;
+      if (isShopName(line) || isLatinGibberish(line) || isUiNoise(line)) return -100;
+
+      const compact = line.replace(/\s/g, "");
+      const cjk = (line.match(/[\u4e00-\u9fff]/g) || []).length;
+      const latin = (line.match(/[A-Za-z]/g) || []).length;
+      let score = 0;
+
+      score += cjk * 3;
+      if (cjk >= 8) score += 12;
+      else if (cjk >= 5) score += 6;
+      else if (cjk >= 3) score += 2;
+
+      if (/Pro|订阅|驱蚊|兰蔻|香水|口红|面膜|精华|乳液|礼盒|耳机|玩偶|手链|保温杯|Cursor|cursor/.test(compact + line)) score += 10;
+      if (/618|抢先购|专享|包邮|独享/.test(compact) && cjk >= 2) score += 4;
+
+      if (/^[xX×]\s*\d+$/.test(compact)) score -= 50;
+      if (/^\d+\s*期/.test(compact)) score -= 30;
+      if (/免息|热销|同款|券后/.test(compact) && compact.length < 12) score -= 20;
+      if (latin > cjk * 3 && cjk < 2) score -= 25;
+
+      return score;
+    }
+
     function looksLikeProduct(line) {
-      return scoreProductCandidate(line) >= 10;
+      return scoreProductCandidate(line) >= 5;
     }
 
     /** 淘宝/京东购物车：每个价格向上找得分最高的商品标题行 */
@@ -624,16 +634,13 @@
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         const compact = line.replace(/\s/g, "");
-        const hasPrice =
-          /[¥￥]\s*[\d,.]+/.test(line) ||
-          /^[\d,.]{2,6}$/.test(compact) && i > 0 && /[¥￥]/.test(lines[i - 1] || "");
-        if (!hasPrice) continue;
-        if (/合计|运费|优惠|满减|已选|消费券|1165/.test(compact)) continue;
+        if (!isLikelyPriceLine(line)) continue;
+        if (/合计|运费|优惠|满减|已选|消费券|1165|88VIP/.test(compact)) continue;
 
         let best = null;
         let bestScore = 0;
 
-        for (let j = i - 1; j >= Math.max(0, i - 14); j--) {
+        for (let j = i - 1; j >= Math.max(0, i - 16); j--) {
           const candidate = lines[j];
           const score = scoreProductCandidate(candidate);
           if (score > bestScore) {
@@ -642,7 +649,7 @@
           }
         }
 
-        if (best && bestScore >= 10) {
+        if (best && bestScore >= 5) {
           const key = best.replace(/\s/g, "").slice(0, 28);
           if (!seen.has(key)) {
             seen.add(key);
@@ -653,22 +660,53 @@
       return found;
     }
 
-    function smartParseLines(raw) {
-      const fromPrice = extractByPriceAnchor(raw);
-      const filtered = fromPrice.filter((s) => !isShopName(s) && !isLatinGibberish(s));
-      if (filtered.length > 0) return filtered;
-
-      const noiseExact = /^(全选|删除|移入收藏|凑单|领券|结算|店铺|合计|再逛逛|编辑|完成|￥|¥|\d+|\d+\.\d+|x\d+|X\d+|库存|有货|无货|降价|失效|重选|规格|颜色分类|尺码|数量|购物车|淘宝|京东|天猫|管理|筛选|搜索)$/i;
-      const priceOnly = /^[￥¥]?\s*[\d,.]+$/;
+    /** 价格锚点失败时：按中文行打分取前几项 */
+    function extractRelaxedFallback(raw) {
       const collapsed = collapseCjkSpaces(raw);
+      const lines = collapsed.split(/\n/).map(cleanLine).filter(Boolean);
+      const ranked = [];
 
+      for (const line of lines) {
+        if (isShopName(line) || isLatinGibberish(line) || isUiNoise(line)) continue;
+        const cjk = (line.match(/[\u4e00-\u9fff]/g) || []).length;
+        if (cjk < 3) continue;
+        const score = scoreProductCandidate(line);
+        if (score < 3) continue;
+        ranked.push({ line, score });
+      }
+
+      ranked.sort((a, b) => b.score - a.score);
+      const out = [];
+      const seen = new Set();
+      for (const { line } of ranked) {
+        const key = line.replace(/\s/g, "").slice(0, 20);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(line);
+        if (out.length >= 8) break;
+      }
+      return out;
+    }
+
+    function smartParseLines(raw) {
+      if (!raw || !raw.trim()) return [];
+
+      let result = extractByPriceAnchor(raw).filter((s) => !isShopName(s) && !isLatinGibberish(s));
+      if (result.length > 0) return result;
+
+      result = extractRelaxedFallback(raw);
+      if (result.length > 0) return result;
+
+      const collapsed = collapseCjkSpaces(raw);
+      const noiseExact = /^(全选|删除|移入收藏|凑单|领券|结算|店铺|合计|再逛逛|编辑|完成|￥|¥|\d+|\d+\.\d+|x\d+|X\d+)$/i;
       return collapsed
         .split(/\n|\t|；|;/)
         .map(cleanLine)
-        .filter((s) => s.length >= 5 && s.length <= 100)
-        .filter((s) => !noiseExact.test(s.replace(/\s/g, "")) && !priceOnly.test(s))
-        .filter((s) => scoreProductCandidate(s) >= 12)
-        .filter((s) => !isShopName(s) && !isLatinGibberish(s));
+        .filter((s) => s.length >= 4 && s.length <= 100)
+        .filter((s) => !noiseExact.test(s.replace(/\s/g, "")))
+        .filter((s) => !isShopName(s) && !isLatinGibberish(s) && !isUiNoise(s))
+        .filter((s) => (s.match(/[\u4e00-\u9fff]/g) || []).length >= 3)
+        .slice(0, 8);
     }
 
     function loadDrawn() {
