@@ -331,6 +331,48 @@
     @keyframes fall {
       to { transform: translateY(100vh) rotate(720deg); opacity: 0; }
     }
+
+    .room-bar {
+      padding: 14px 16px;
+      margin-bottom: 14px;
+    }
+
+    .room-label {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .room-link-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .room-link-row input {
+      flex: 1;
+      min-width: 0;
+      border: 1px solid #ecdde2;
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 0.72rem;
+      background: #faf6f7;
+      color: var(--text);
+    }
+
+    .room-link-row button {
+      flex-shrink: 0;
+      padding: 8px 14px;
+      font-size: 0.82rem;
+    }
+
+    .cloud-status {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    .cloud-status.ok { color: #2a9d6a; }
+    .cloud-status.warn { color: #c47a20; }
   </style>
 </head>
 <body>
@@ -339,6 +381,15 @@
       <h1>🎁 礼物盲盒</h1>
       <p>把购物车里的东西放进盲盒<br>随机抽一件，就是这次想要的礼物～</p>
     </header>
+
+    <div class="card room-bar">
+      <div class="room-label">☁️ 共享链接（发给她，礼物池和抽奖结果会同步）</div>
+      <div class="room-link-row">
+        <input type="text" id="roomLink" readonly />
+        <button class="btn-soft" type="button" id="btnCopyLink">复制</button>
+      </div>
+      <div class="cloud-status" id="cloudStatus">正在连接云端…</div>
+    </div>
 
     <div class="steps">
       <div class="step active" id="step1Badge">① 导入购物车</div>
@@ -426,6 +477,11 @@
   <script>
     const STORAGE_KEY = "gift_blind_box_items_v2";
     const DRAWN_KEY = "gift_blind_box_drawn_v2";
+    const ROOM_KEY = "gift_blind_box_room_v1";
+
+    const roomLink = document.getElementById("roomLink");
+    const btnCopyLink = document.getElementById("btnCopyLink");
+    const cloudStatus = document.getElementById("cloudStatus");
 
     const itemList = document.getElementById("itemList");
     const emptyHint = document.getElementById("emptyHint");
@@ -482,6 +538,97 @@
     let items = [];
     let rolling = false;
     let viewMode = "setup";
+    let roomId = "";
+    let cloudOk = false;
+    let syncTimer = null;
+
+    function getRoomId() {
+      const fromUrl = new URLSearchParams(location.search).get("room");
+      if (fromUrl && /^[a-zA-Z0-9_-]{4,32}$/.test(fromUrl)) {
+        roomId = fromUrl;
+        localStorage.setItem(ROOM_KEY, roomId);
+        return roomId;
+      }
+      const stored = localStorage.getItem(ROOM_KEY);
+      if (stored && /^[a-zA-Z0-9_-]{4,32}$/.test(stored)) {
+        roomId = stored;
+      } else {
+        roomId = "kk" + Math.random().toString(36).slice(2, 8);
+        localStorage.setItem(ROOM_KEY, roomId);
+      }
+      const u = new URL(location.href);
+      u.searchParams.set("room", roomId);
+      history.replaceState(null, "", u);
+      return roomId;
+    }
+
+    function updateRoomLinkDisplay() {
+      roomLink.value = location.origin + location.pathname + "?room=" + roomId;
+    }
+
+    function setCloudStatus(text, kind) {
+      cloudStatus.textContent = text;
+      cloudStatus.className = "cloud-status" + (kind ? " " + kind : "");
+    }
+
+    async function loadFromCloud() {
+      try {
+        const res = await fetch("/api/room/" + encodeURIComponent(roomId));
+        if (res.status === 503) {
+          setCloudStatus("当前仅本机保存，管理员配置云端后可共享", "warn");
+          return false;
+        }
+        if (!res.ok) throw new Error("load failed");
+        const data = await res.json();
+        if (Array.isArray(data.items)) items = data.items;
+        if (Array.isArray(data.drawn)) {
+          localStorage.setItem(DRAWN_KEY, JSON.stringify(data.drawn));
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+        cloudOk = true;
+        setCloudStatus("☁️ 已同步云端，你和她打开同一链接即可共享", "ok");
+        return true;
+      } catch {
+        cloudOk = false;
+        setCloudStatus("云端暂不可用，数据仅保存在本机", "warn");
+        return false;
+      }
+    }
+
+    function syncToCloud() {
+      if (!roomId) return;
+      clearTimeout(syncTimer);
+      syncTimer = setTimeout(async () => {
+        try {
+          const res = await fetch("/api/room/" + encodeURIComponent(roomId), {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ items, drawn: loadDrawn() }),
+          });
+          if (res.status === 503) {
+            setCloudStatus("云端未配置，当前仅本机保存", "warn");
+            cloudOk = false;
+            return;
+          }
+          if (!res.ok) throw new Error("sync failed");
+          cloudOk = true;
+          setCloudStatus("☁️ 已保存到云端", "ok");
+        } catch {
+          cloudOk = false;
+          setCloudStatus("同步失败，请检查网络", "warn");
+        }
+      }, 500);
+    }
+
+    btnCopyLink.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(roomLink.value);
+        showToast("链接已复制，发给她即可");
+      } catch {
+        roomLink.select();
+        showToast("请手动复制链接");
+      }
+    });
 
     function showToast(msg) {
       toast.textContent = msg;
@@ -764,10 +911,12 @@
 
     function saveDrawn(arr) {
       localStorage.setItem(DRAWN_KEY, JSON.stringify(arr));
+      syncToCloud();
     }
 
     function persistItems() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+      syncToCloud();
     }
 
     function loadItems() {
@@ -1022,10 +1171,17 @@
       }, 80);
     });
 
-    loadItems();
-    if (items.length > 0) setView("draw");
-    else setView("setup");
-    renderAll();
+    async function initApp() {
+      getRoomId();
+      updateRoomLinkDisplay();
+      loadItems();
+      await loadFromCloud();
+      if (items.length > 0) setView("draw");
+      else setView("setup");
+      renderAll();
+    }
+
+    initApp();
   </script>
 </body>
 </html>
