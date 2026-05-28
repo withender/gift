@@ -382,8 +382,8 @@
       <p>把购物车里的东西放进盲盒<br>随机抽一件，就是这次想要的礼物～</p>
     </header>
 
-    <div class="card room-bar">
-      <div class="room-label">☁️ 共享链接（发给她，礼物池和抽奖结果会同步）</div>
+    <div class="card room-bar hidden" id="roomBar">
+      <div class="room-label">☁️ 共享链接（仅管理员可见，复制后去掉 &admin=1 再发给她）</div>
       <div class="room-link-row">
         <input type="text" id="roomLink" readonly />
         <button class="btn-soft" type="button" id="btnCopyLink">复制</button>
@@ -482,6 +482,7 @@
     const roomLink = document.getElementById("roomLink");
     const btnCopyLink = document.getElementById("btnCopyLink");
     const cloudStatus = document.getElementById("cloudStatus");
+    const roomBar = document.getElementById("roomBar");
 
     const itemList = document.getElementById("itemList");
     const emptyHint = document.getElementById("emptyHint");
@@ -541,6 +542,16 @@
     let roomId = "";
     let cloudOk = false;
     let syncTimer = null;
+    let isAdmin = false;
+
+    function isAdminMode() {
+      return new URLSearchParams(location.search).get("admin") === "1";
+    }
+
+    function applyAdminUI() {
+      isAdmin = isAdminMode();
+      roomBar.classList.toggle("hidden", !isAdmin);
+    }
 
     function getRoomId() {
       const fromUrl = new URLSearchParams(location.search).get("room");
@@ -567,6 +578,7 @@
     }
 
     function setCloudStatus(text, kind) {
+      if (!isAdmin) return;
       cloudStatus.textContent = text;
       cloudStatus.className = "cloud-status" + (kind ? " " + kind : "");
     }
@@ -1172,7 +1184,9 @@
     });
 
     async function initApp() {
+      applyAdminUI();
       getRoomId();
+      applyAdminUI();
       updateRoomLinkDisplay();
       loadItems();
       await loadFromCloud();
