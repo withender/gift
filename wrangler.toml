@@ -1,7 +1,12 @@
 # Cloudflare Pages 配置
-# D1 请在 Dashboard → Pages 项目 → Settings → Functions 里绑定（Variable name: DB）
-# 不要在这里写假的 database_id，否则部署会失败
+# ⚠️ 有本文件时，Dashboard 里「绑定 → 添加」会变灰，D1 只能写在这里
 
 name = "mygift"
 compatibility_date = "2024-09-01"
 pages_build_output_dir = "."
+
+[[d1_databases]]
+binding = "DB"
+database_name = "gift-box"
+# 把下面换成 D1 控制台里的真实 Database ID（UUID 格式）
+database_id = "5cc1daee-37f1-4c8e-bf9b-49612691e392"
