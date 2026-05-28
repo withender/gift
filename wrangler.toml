@@ -1,11 +1,7 @@
-# Cloudflare Pages 项目配置（与 GitHub 仓库 deploy 目录根目录一致）
-# 创建 D1 后，把 database_id 填到下面，或在 Pages 控制台手动绑定 D1
+# Cloudflare Pages 配置
+# D1 请在 Dashboard → Pages 项目 → Settings → Functions 里绑定（Variable name: DB）
+# 不要在这里写假的 database_id，否则部署会失败
 
-name = "gift"
+name = "mygift"
 compatibility_date = "2024-09-01"
 pages_build_output_dir = "."
-
-[[d1_databases]]
-binding = "DB"
-database_name = "gift-box"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
